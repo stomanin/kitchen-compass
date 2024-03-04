@@ -45,49 +45,51 @@ logging.basicConfig(
 
 # start function called every time the Bot receives a Telegram message that contains the /start command
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await context.bot.send_message(
-        chat_id=update.effective_chat.id,
-        text="Hello, I'm your KitchenCompass bot 👩‍🍳, I am here to help plan your meals for the week! 🍽!\
-        \n \n⌛ Hold on a few moments until I prepare a meal plan for you. ⌛\
-        \n \nI will propose 2 recipes 📋 for 2 people 👯 with a calorie count of appox 700kcal per portion."
-    )
-    
-    responses = get_completion_from_messages(messages)
-    await context.bot.send_message(chat_id=update.effective_chat.id, text=responses)
+    if update.message.from_user.is_bot == False:
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="Hello, I'm your KitchenCompass bot 👩‍🍳, I am here to help plan your meals for the week! 🍽!\
+            \n \n⌛ Hold on a few moments until I prepare a meal plan for you. ⌛\
+            \n \nI will propose 2 recipes 📋 for 2 people 👯 with a calorie count of appox 700kcal per portion."
+        )
+        
+        responses = get_completion_from_messages(messages)
+        await context.bot.send_message(chat_id=update.effective_chat.id, text=responses)
 
 async def audio_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     print("audio handler")
+    if update.message.from_user.is_bot == False:
+        if update.message.voice:
+            file_id = update.message.voice.file_id
+            # download file
+            file = await context.bot.get_file(file_id)
+            await file.download_to_drive(f"downloaded_audio_{file_id}.ogg")  # You can specify the desired file name
+            
+            # use whisper to transcribe audio messages
+            from openai import OpenAI
+            client = OpenAI()
 
-    if update.message.voice:
-        file_id = update.message.voice.file_id
-        # download file
-        file = await context.bot.get_file(file_id)
-        await file.download_to_drive(f"downloaded_audio_{file_id}.ogg")  # You can specify the desired file name
-        
-        # use whisper to transcribe audio messages
-        from openai import OpenAI
-        client = OpenAI()
+            with open(f"downloaded_audio_{file_id}.ogg", 'rb') as audio_file:
+                transcription = client.audio.transcriptions.create(
+                    model="whisper-1", 
+                    file=audio_file,
+                    response_format="text"
+                )
+            print(transcription)
+            # delete downloaded audio file after the transcription is done
+            os.remove(f"downloaded_audio_{file_id}.ogg")
+            
+            response = save_context_get_response(transcription)
 
-        with open(f"downloaded_audio_{file_id}.ogg", 'rb') as audio_file:
-            transcription = client.audio.transcriptions.create(
-                model="whisper-1", 
-                file=audio_file,
-                response_format="text"
-            )
-        print(transcription)
-        # delete downloaded audio file after the transcription is done
-        os.remove(f"downloaded_audio_{file_id}.ogg")
-        
-        response = save_context_get_response(transcription)
-
-        #returns the response
-        await context.bot.send_message(chat_id=update.effective_chat.id, text=response)
+            #returns the response
+            await context.bot.send_message(chat_id=update.effective_chat.id, text=response)
 
 # triggers the openai bot 
 async def chatgptbot(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    response = save_context_get_response(update.message.text)
-    #returns the response
-    await context.bot.send_message(chat_id=update.effective_chat.id, text=response)
+    if update.message.from_user.is_bot == False:
+        response = save_context_get_response(update.message.text)
+        #returns the response
+        await context.bot.send_message(chat_id=update.effective_chat.id, text=response)
 
 
 if __name__ == '__main__':
